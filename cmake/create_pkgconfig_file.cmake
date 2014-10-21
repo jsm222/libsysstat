@@ -17,7 +17,7 @@ macro (create_pkgconfig_file name desc)
             "Name: ${name}\n"
             "Description: ${desc}\n"
             "Version: ${SYSSTAT_VERSION}\n"
-            "Requires: Qt5Core\n"
+            "Requires: QtCore\n"
             "Libs: -L\${libdir} -l${name}\n"
             "Cflags: -I\${includedir}\n"
             "\n"
