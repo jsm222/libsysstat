@@ -180,7 +180,8 @@ void CpuStatPrivate::updateSources()
 
         addSource(QString::fromLatin1("cpu%1").arg(i));
     }
-#endif
+#else
+
 #if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
     const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), Qt::SkipEmptyParts);
 #else
