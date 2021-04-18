@@ -88,9 +88,7 @@ MemStatPrivate::MemStatPrivate(MemStat *parent)
     mSources << QLatin1String("memory") << QLatin1String("swap");
 }
 
-MemStatPrivate::~MemStatPrivate()
-{
-}
+MemStatPrivate::~MemStatPrivate() = default;
 
 void MemStatPrivate::timeout()
 {
@@ -131,10 +129,18 @@ void MemStatPrivate::timeout()
         kvm_close(kd);
 #endif
 #ifndef HAVE_SYSCTL_H
+#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+    const QStringList rows = readAllFile("/proc/meminfo").split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+#else
     const QStringList rows = readAllFile("/proc/meminfo").split(QLatin1Char('\n'), QString::SkipEmptyParts);
+#endif
     for (const QString &row : rows)
     {
+#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+        QStringList tokens = row.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+#else
         QStringList tokens = row.split(QLatin1Char(' '), QString::SkipEmptyParts);
+#endif
         if (tokens.size() != 3)
             continue;
 
@@ -193,8 +199,6 @@ MemStat::MemStat(QObject *parent)
     connect(impl, SIGNAL(swapUpdate(float)), this, SIGNAL(swapUpdate(float)));
 }
 
-MemStat::~MemStat()
-{
-}
+MemStat::~MemStat() = default;
 
 }

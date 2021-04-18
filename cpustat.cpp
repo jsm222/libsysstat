@@ -150,8 +150,8 @@ void CpuStatPrivate::addSource(const QString &source)
 
             free(t);
             mBounds[source] = qMakePair(min, max);
-        #else
-    bool ok;
+#else
+    bool ok = false;
 
     uint min = readAllFile(qPrintable(QString::fromLatin1("/sys/devices/system/cpu/%1/cpufreq/scaling_min_freq").arg(source))).toUInt(&ok);
     if (ok)
@@ -180,11 +180,19 @@ void CpuStatPrivate::updateSources()
 
         addSource(QString::fromLatin1("cpu%1").arg(i));
     }
+#endif
+#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+    const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), Qt::SkipEmptyParts);
 #else
     const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), QString::SkipEmptyParts);
+#endif
     for (const QString &row : rows)
     {
+#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+        QStringList tokens = row.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+#else
         QStringList tokens = row.split(QLatin1Char(' '), QString::SkipEmptyParts);
+#endif
         if( (tokens.size() < 5)
         || (!tokens[0].startsWith(QLatin1String("cpu"))) )
             continue;
@@ -194,9 +202,13 @@ void CpuStatPrivate::updateSources()
 
     mBounds.clear();
 
-    bool ok;
+    bool ok = false;
 
+#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+    const QStringList ranges = readAllFile("/sys/devices/system/cpu/online").split(QLatin1Char(','), Qt::SkipEmptyParts);
+#else
     const QStringList ranges = readAllFile("/sys/devices/system/cpu/online").split(QLatin1Char(','), QString::SkipEmptyParts);
+#endif
     for (const QString &range : ranges)
     {
         int dash = range.indexOf(QLatin1Char('-'));
@@ -221,9 +233,7 @@ void CpuStatPrivate::updateSources()
 #endif
 }
 
-CpuStatPrivate::~CpuStatPrivate()
-{
-}
+CpuStatPrivate::~CpuStatPrivate() = default;
 
 void CpuStatPrivate::intervalChanged()
 {
@@ -351,7 +361,11 @@ void CpuStatPrivate::timeout()
     if ( (mMonitoring == CpuStat::LoadOnly)
       || (mMonitoring == CpuStat::LoadAndFrequency) )
     {
+#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+        const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), Qt::SkipEmptyParts);
+#else
         const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), QString::SkipEmptyParts);
+#endif
         for (const QString &row : rows)
         {
             if (!row.startsWith(QLatin1String("cpu")))
@@ -359,7 +373,11 @@ void CpuStatPrivate::timeout()
 
             if (row.startsWith(mSource + QLatin1Char(' ')))
             {
+#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+                QStringList tokens = row.split(QLatin1Char(' '), Qt::SkipEmptyParts);
+#else
                 QStringList tokens = row.split(QLatin1Char(' '), QString::SkipEmptyParts);
+#endif
                 if (tokens.size() < 5)
                     continue;
 
@@ -392,7 +410,7 @@ void CpuStatPrivate::timeout()
                         float freqRate = 1.0;
                         uint freq = 0;
 
-                        bool ok;
+                        bool ok = false;
 
                         if (mSource == QLatin1String("cpu"))
                         {
@@ -454,7 +472,7 @@ void CpuStatPrivate::timeout()
     }
     else
     {
-        bool ok;
+        bool ok = false;
         uint freq = 0;
 
         if (mSource == QLatin1String("cpu"))
@@ -532,9 +550,7 @@ CpuStat::CpuStat(QObject *parent)
     connect(impl, SIGNAL(update(uint)), this, SIGNAL(update(uint)));
 }
 
-CpuStat::~CpuStat()
-{
-}
+CpuStat::~CpuStat() = default;
 
 void CpuStat::updateSources()
 {
