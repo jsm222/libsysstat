@@ -54,21 +54,13 @@ NetStatPrivate::NetStatPrivate(NetStat *parent)
 
 #ifndef HAVE_SYSCTL_H
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
     QStringList rows(readAllFile("/proc/net/dev").split(QLatin1Char('\n'), Qt::SkipEmptyParts));
-#else
-    QStringList rows(readAllFile("/proc/net/dev").split(QLatin1Char('\n'), QString::SkipEmptyParts));
-#endif
 
     rows.erase(rows.begin(), rows.begin() + 2);
 
     for (const QString &row : qAsConst(rows))
     {
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
         QStringList tokens = row.split(QLatin1Char(':'), Qt::SkipEmptyParts);
-#else
-        QStringList tokens = row.split(QLatin1Char(':'), QString::SkipEmptyParts);
-#endif
         if (tokens.size() != 2)
             continue;
 
@@ -146,11 +138,8 @@ void NetStatPrivate::timeout()
 
         }
     }
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
+#else 
     QStringList rows(readAllFile("/proc/net/dev").split(QLatin1Char('\n'), Qt::SkipEmptyParts));
-#else
-    QStringList rows(readAllFile("/proc/net/dev").split(QLatin1Char('\n'), QString::SkipEmptyParts));
-#endif
 
 
     if (rows.size() < 2)
@@ -159,13 +148,8 @@ void NetStatPrivate::timeout()
     QStringList names = rows[1].split(QLatin1Char('|'));
     if (names.size() != 3)
         return;
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
     QStringList namesR = names[1].split(QLatin1Char(' '), Qt::SkipEmptyParts);
     QStringList namesT = names[2].split(QLatin1Char(' '), Qt::SkipEmptyParts);
-#else
-    QStringList namesR = names[1].split(QLatin1Char(' '), QString::SkipEmptyParts);
-    QStringList namesT = names[2].split(QLatin1Char(' '), QString::SkipEmptyParts);
-#endif
     int receivedIndex    =                 namesR.indexOf(QLatin1String("bytes"));
     int transmittedIndex = namesR.size() + namesT.indexOf(QLatin1String("bytes"));
 
@@ -173,21 +157,13 @@ void NetStatPrivate::timeout()
 
     for (const QString &row : qAsConst(rows))
     {
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
         QStringList tokens = row.split(QLatin1Char(':'), Qt::SkipEmptyParts);
-#else
-        QStringList tokens = row.split(QLatin1Char(':'), QString::SkipEmptyParts);
-#endif
         if (tokens.size() != 2)
             continue;
 
         QString interfaceName = tokens[0].trimmed();
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
         QStringList data = tokens[1].split(QLatin1Char(' '), Qt::SkipEmptyParts);
-#else
-        QStringList data = tokens[1].split(QLatin1Char(' '), QString::SkipEmptyParts);
-#endif
         if (data.size() < transmittedIndex)
             continue;
 
