@@ -188,19 +188,10 @@ void CpuStatPrivate::updateSources()
 
     mBounds[QStringLiteral("cpu")] = qMakePair(min,max);
 #else
-
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
     const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-#else
-    const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), QString::SkipEmptyParts);
-#endif
     for (const QString &row : rows)
     {
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
         QStringList tokens = row.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-#else
-        QStringList tokens = row.split(QLatin1Char(' '), QString::SkipEmptyParts);
-#endif
         if( (tokens.size() < 5)
         || (!tokens[0].startsWith(QLatin1String("cpu"))) )
             continue;
@@ -212,11 +203,7 @@ void CpuStatPrivate::updateSources()
 
     bool ok = false;
 
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
     const QStringList ranges = readAllFile("/sys/devices/system/cpu/online").split(QLatin1Char(','), Qt::SkipEmptyParts);
-#else
-    const QStringList ranges = readAllFile("/sys/devices/system/cpu/online").split(QLatin1Char(','), QString::SkipEmptyParts);
-#endif
     for (const QString &range : ranges)
     {
         int dash = range.indexOf(QLatin1Char('-'));
@@ -375,11 +362,7 @@ void CpuStatPrivate::timeout()
     if ( (mMonitoring == CpuStat::LoadOnly)
       || (mMonitoring == CpuStat::LoadAndFrequency) )
     {
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
         const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), Qt::SkipEmptyParts);
-#else
-        const QStringList rows = readAllFile("/proc/stat").split(QLatin1Char('\n'), QString::SkipEmptyParts);
-#endif
         for (const QString &row : rows)
         {
             if (!row.startsWith(QLatin1String("cpu")))
@@ -387,11 +370,7 @@ void CpuStatPrivate::timeout()
 
             if (row.startsWith(mSource + QLatin1Char(' ')))
             {
-#if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
                 QStringList tokens = row.split(QLatin1Char(' '), Qt::SkipEmptyParts);
-#else
-                QStringList tokens = row.split(QLatin1Char(' '), QString::SkipEmptyParts);
-#endif
                 if (tokens.size() < 5)
                     continue;
 
