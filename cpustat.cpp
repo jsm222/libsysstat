@@ -22,10 +22,7 @@
 **  51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
 **
 ** END_COMMON_COPYRIGHT_HEADER */
-
-
 #include <unistd.h>
-
 #include "cpustat.h"
 #ifdef HAVE_SYSCTL_H
 extern "C"
@@ -71,18 +68,17 @@ int GetCpu(void)
 }
 
 /* Frequence is in MHz */
-ulong CpuStatPrivate::CurrentFreq(void)
+ulong CpuStatPrivate::CurrentFreq(QString mSource)
 {
     ulong freq=0;
     size_t len = sizeof(freq);
-
-    if (sysctl(mib2,4,&freq, &len, NULL, 0) < 0) { // man cpufreq BUGS section all cores have the same frequency.
-	perror("sysctl");
+    int i = mSource.mid(3).toInt();
+    if (sysctl(mib2[i],4,&freq, &len, NULL, 0) < 0) {
+    	perror("sysctl");
         return 0;
-}
+    }
     else
         return freq;
-
 }
 #endif
 CpuStatPrivate::CpuStatPrivate(CpuStat *parent)
@@ -97,7 +93,11 @@ CpuStatPrivate::CpuStatPrivate(CpuStat *parent)
     size_t alen=4;
     sysctlnametomib("kern.cp_times",mib0,&flen);
     sysctlnametomib("kern.cp_time",mib1,&flen);
-    sysctlnametomib("dev.cpu.0.freq",mib2,&alen);
+    int ncpu = GetCpu();
+    for (int i=0;i<ncpu;i++) {
+    QString cpu_sysctl_name = QString::fromLatin1("dev.cpu.%1.freq").arg(i);
+    sysctlnametomib(cpu_sysctl_name.toStdString().c_str(),mib2[i],&alen);
+    }
 #endif
     mUserHz = sysconf(_SC_CLK_TCK);
 
@@ -115,9 +115,11 @@ void CpuStatPrivate::addSource(const QString &source)
             /* The string returned by the dev.cpu.0.freq_levels sysctl
              * is a space separated list of MHz/milliwatts.
              */
-            if (sysctlbyname("dev.cpu.0.freq_levels", buf, &len, NULL, 0) < 0)
-                return;
+            if (source != QStringLiteral("cpu") && source.midRef(3).toInt() >-1) {
 
+                if (sysctlbyname(QString::fromLatin1("dev.cpu.%1.freq_levels").arg(source.midRef(3).toInt()).toStdString().c_str(), buf, &len, NULL, 0) < 0)
+                    return;
+            }
             t = strndup(buf, len);
             if (t == NULL)
             {
@@ -142,9 +144,7 @@ void CpuStatPrivate::addSource(const QString &source)
                         if ((min == 0) || (res < min))
                             min = res;
                     }
-               	if (res + 1 == max)
-			max--;
-		}
+               	}
 
             }
 
@@ -171,15 +171,22 @@ void CpuStatPrivate::updateSources()
     int cpu;
 
     cpu = GetCpu();
-    mSources.append(QStringLiteral("cpu")); // Linux has cpu in /proc/stat
+    mSources.append(QString::fromLatin1("cpu"));
     for (int i =0;i<cpu;i++)
     {
         mSources.append(QString::fromLatin1("cpu%1").arg(i));
-
-
-
         addSource(QString::fromLatin1("cpu%1").arg(i));
     }
+    long max=0;
+    long min=0;
+    for (Bounds::ConstIterator I = mBounds.constBegin(); I != mBounds.constEnd(); ++I)
+    {
+        min += mBounds[I.key()].first;
+        max += mBounds[I.key()].second;
+
+    }
+
+    mBounds[QStringLiteral("cpu")] = qMakePair(min,max);
 #else
 
 #if (QT_VERSION >= QT_VERSION_CHECK(5,15,0))
@@ -264,7 +271,9 @@ void CpuStatPrivate::timeout()
             {
                 int cpuNumber=0;
                 long *cp_times=0;
-                if(mSource!=QLatin1String("cpu")) {
+
+                if(mSource!=QLatin1String("cpu"))
+                {
                     size_t cp_size = sizeof(long) * CPUSTATES * GetCpu();
                     cp_times = (long *)malloc(cp_size);
                     cpuNumber = mSource.midRef(3).toInt();
@@ -274,7 +283,10 @@ void CpuStatPrivate::timeout()
                     size_t cp_size = sizeof(long)*CPUSTATES;
                     cp_times = (long *)malloc(cp_size);
                     if(sysctl(mib1,2,cp_times,&cp_size,NULL,0) < 0)
+                    {
+                        perror("sysctl");
                         free(cp_times);
+                    }
                 }
                 Values current;
                 current.user = static_cast<ulong>(cp_times[CP_USER+cpuNumber*CPUSTATES]);
@@ -283,49 +295,51 @@ void CpuStatPrivate::timeout()
                 current.idle = static_cast<ulong>(cp_times[CP_IDLE+cpuNumber*CPUSTATES]);
                 current.other = static_cast<ulong>(cp_times[CP_INTR+cpuNumber*CPUSTATES]);
                 current.total = current.user + current.nice + current.system+current.idle+current.other;
-
                 float sumDelta = static_cast<float>(current.total - mPrevious.total);
                 if ((mPrevious.total != 0) && ((sumDelta < mIntervalMin) || (sumDelta > mIntervalMax)))
                 {
                     if (mMonitoring == CpuStat::LoadAndFrequency) 
-		    {
+		            {
                         float freqRate = 1.0;
-                        ulong freq = CurrentFreq();
+                        ulong freq = CurrentFreq(mSource);
 				
+                        	if (mSource == QLatin1String("cpu")) {
+                                freq=0;
+                                for (Bounds::ConstIterator I = mBounds.constBegin(); I != mBounds.constEnd(); ++I) {
+                                    if (I.key() != QStringLiteral("cpu"))
+                                    {
+                                        freq += CurrentFreq(I.key());
+                                    }
+                                }
+                            }
+
                         if (freq > 0)
                        	{
-			if (mSource == QLatin1String("cpu"))
-				mSource = QLatin1String("cpu0");
-			//do not report more than 100%
-                	if (freq > mBounds[mSource].second) {
-				freq = mBounds[mSource].second;
-			}
                         freqRate = static_cast<float>(freq) / static_cast<float>(mBounds[mSource].second);
                         emit update(0.0, 0.0, 0.0, 0.0, static_cast<float>(freqRate), freq);
-			}
-	            }
-                    else {
+                        }
+                    } else {
                         emit update(0.0, 0.0, 0.0, 0.0);
-			 }
+			        }
                     mPrevious.clear();
-                }
-                else
-
-                {
-                    if (mMonitoring == CpuStat::LoadAndFrequency)
+                } else {
+                        if (mMonitoring == CpuStat::LoadAndFrequency)
                     {
                         float freqRate = 1.0;
-                        ulong freq = CurrentFreq();
+                        ulong freq = CurrentFreq(mSource);
 				
                         if (freq > 0)
                         {
-			if (mSource == QLatin1String("cpu"))
-				mSource = QLatin1String("cpu0");
-			//do not report more than 100%
-                	if (freq > mBounds[mSource].second) {
-				freq = mBounds[mSource].second;
-			}
-                        freqRate = static_cast<float>(freq) / static_cast<float>(mBounds[mSource].second);
+					        if (mSource == QLatin1String("cpu")) {
+                                freq=0;
+                                for (Bounds::ConstIterator I = mBounds.constBegin(); I != mBounds.constEnd(); ++I) {
+                                    if (I.key() != QStringLiteral("cpu"))
+                                    {
+                                        freq += CurrentFreq(I.key());
+                                    }
+                        }
+                        }
+		                freqRate = static_cast<float>(freq) / static_cast<float>(mBounds[mSource].second);
                            emit update(
                                static_cast<float>(current.user   - mPrevious.user  ) / sumDelta,
                                static_cast<float>(current.nice   - mPrevious.nice  ) / sumDelta,
@@ -333,8 +347,9 @@ void CpuStatPrivate::timeout()
                                static_cast<float>(current.other  - mPrevious.other ) / sumDelta,
                                static_cast<float>(freqRate),
                                freq);
-                            }
+
                         }
+                    }
                         else
                         {
                             emit update(
@@ -344,17 +359,15 @@ void CpuStatPrivate::timeout()
                                 static_cast<float>(current.other  - mPrevious.other ) / sumDelta);
                         }
 
-
                     mPrevious = current;
                 }
-
                 free(cp_times);
             }
             else
             {
                 ulong freq = 0;
 
-                freq = CurrentFreq();
+                freq = CurrentFreq(mSource);
                 if (freq > 0)
                     emit update(freq);
             }

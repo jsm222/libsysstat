@@ -58,7 +58,7 @@ public:
 #ifdef HAVE_SYSCTL_H
     ulong minFreq(const QString &source) const;
     ulong maxFreq(const QString &source) const;
-    ulong CurrentFreq(void);
+    ulong CurrentFreq(const QString);
 
 #else
     uint minFreq(const QString &source) const;
@@ -112,7 +112,7 @@ private:
     typedef QMap<QString, QPair<ulong, ulong> > Bounds;
     int mib0[2];
     int mib1[2];
-    int mib2[4];
+    int mib2[512][4];
 #else
     typedef QMap<QString, QPair<uint, uint> > Bounds;
 #endif
